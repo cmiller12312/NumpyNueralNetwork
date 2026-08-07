@@ -263,7 +263,6 @@ if __name__ == "__main__":
 
         actual = yTest[i]
 
-        # calculate loss
         totalLoss += nn.runLossSingle(
             prediction,
             yTestEncoded[i].reshape(-1,1),
@@ -287,6 +286,7 @@ if __name__ == "__main__":
     print("Accuracy:", accuracy)
     print("Average Loss:", averageLoss)
 
+    #comparing it to skikit to test if it works as well as config
     clf = MLPClassifier(
         hidden_layer_sizes=(64,64),
         activation="relu",
