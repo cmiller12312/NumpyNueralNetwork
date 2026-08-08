@@ -148,6 +148,7 @@ class NueralNetwork:
 
         if derivative:
             temp = (expValues / numpy.sum(expValues))
+            #y = e^x/sum of all e^x
             # when input index and output derivate are the same the derivative is y(1-y)
             # when the indexs are not the same its -y*y
             return numpy.diag(temp) - numpy.outer(temp, temp)
@@ -178,6 +179,9 @@ class NueralNetwork:
         #getting the output layer
         output = self.activations[-1]
         #dL/dZ = dL/activation * activation/dz
+
+
+        #this part will be reworked to support more options soon
 
         #chain rule applies here
         #since output is defined by me to have a possible different activation we do this. 
