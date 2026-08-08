@@ -51,6 +51,7 @@ class NueralNetwork:
         self.status = True
             
     def forwardFeed(self, input):
+            #reminder zs are the pre activation values
             self.zs = []
             self.activations = [input]
 
@@ -139,12 +140,19 @@ class NueralNetwork:
         if type == "sigmoid":
             return self.sigmoid(input, derivative=derivative)
         if type == "softmax":
-            return self.softmax(input)
+            return self.softmax(input, derivative=derivative)
     
 
-    def softmax(self, input):
+    def softmax(self, input, derivative=False):
         expValues = numpy.exp(input - numpy.max(input))
-        return expValues / numpy.sum(expValues)
+
+        if derivative:
+            temp = (expValues / numpy.sum(expValues))
+            # when input index and output derivate are the same the derivative is y(1-y)
+            # when the indexs are not the same its -y*y
+            return numpy.diag(temp) - numpy.outer(temp, temp)
+        else:
+            return expValues / numpy.sum(expValues)
     
     def ReLU(self, input, derivative=False):
         if derivative:
