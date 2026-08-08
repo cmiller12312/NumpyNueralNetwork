@@ -81,9 +81,9 @@ class NueralNetwork:
 
         self.backwardFeed(actual)
 
-    def runLossSingle(self, predicted, actual, method):
+    def runLossSingle(self, predicted, actual, method, derivative=False):
         if method == "MSE":
-            return self.MSElossSingle(predicted, actual)
+            return self.MSElossSingle(predicted, actual, derivative=derivative)
         if method == "crossEntropy":
             return self.crossEntropy(predicted, actual)
 
@@ -122,12 +122,14 @@ class NueralNetwork:
                     break
                 print(epoch)
 
-    def MSElossSingle(self, predicted, actual):
+    def MSElossSingle(self, predicted, actual, derivative=False):
         # we multiply by 0.5 because when we take the derivative and get 2(output - actual) it cancels out 
         predicted = numpy.clip(predicted, 1e-12, 1)
+        if derivative:
+            return (1 / actual.size) * -(actual-predicted)
         return numpy.mean(0.5 * numpy.square(predicted - actual))
 
-    def crossEntropy(self, predicted, actual):
+    def crossEntropySingle(self, predicted, actual):
 
         #clipping will prevent the value from skewing it too hard
         predicted = numpy.clip(predicted, 1e-12, 1)
@@ -191,7 +193,7 @@ class NueralNetwork:
             delta = output - actual
 
         elif self.OutputActivation == "sigmoid" and self.lossFunction == "MSE":
-            delta = (output - actual) * self.sigmoid(self.zs[-1], derivative=True)
+            delta = self.runLossSingle(output,actual, "MSE", True) * self.sigmoid(self.zs[-1], derivative=True)
 
         else:
             raise Exception("Unsupported activation/loss combination")
@@ -239,8 +241,8 @@ if __name__ == "__main__":
     nn = NueralNetwork(
         layers=[X.shape[1],64,32, numClasses],
         learningRate=0.01,
-        OutputActivation="softmax",
-        lossFunction="crossEntropy",
+        OutputActivation="sigmoid",
+        lossFunction="MSE",
         convergenceMargin=1e-5
     )
 
