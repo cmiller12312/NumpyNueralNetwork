@@ -85,7 +85,7 @@ class NueralNetwork:
         if method == "MSE":
             return self.MSElossSingle(predicted, actual, derivative=derivative)
         if method == "crossEntropy":
-            return self.crossEntropy(predicted, actual)
+            return self.crossEntropySingle(predicted, actual, derivative=derivative)
 
     def trainSingles(self, input, actual):
 
@@ -124,15 +124,13 @@ class NueralNetwork:
 
     def MSElossSingle(self, predicted, actual, derivative=False):
         # we multiply by 0.5 because when we take the derivative and get 2(output - actual) it cancels out 
-        predicted = numpy.clip(predicted, 1e-12, 1)
         if derivative:
             return (1 / actual.size) * -(actual-predicted)
         return numpy.mean(0.5 * numpy.square(predicted - actual))
 
-    def crossEntropySingle(self, predicted, actual):
-
-        #clipping will prevent the value from skewing it too hard
-        predicted = numpy.clip(predicted, 1e-12, 1)
+    def crossEntropySingle(self, predicted, actual, derivative=False):
+        if derivative:
+            return -(numpy.divide(actual,predicted))
         return -numpy.sum(actual * numpy.log(predicted))
 
 
@@ -149,7 +147,7 @@ class NueralNetwork:
         expValues = numpy.exp(input - numpy.max(input))
 
         if derivative:
-            temp = (expValues / numpy.sum(expValues))
+            temp = (expValues / numpy.sum(expValues)).reshape(-1)
             #y = e^x/sum of all e^x
             # when input index and output derivate are the same the derivative is y(1-y)
             # when the indexs are not the same its -y*y
@@ -163,7 +161,6 @@ class NueralNetwork:
         return numpy.maximum(0, input)
         
     def sigmoid(self, input, derivative=False):
-        input = numpy.clip(input, -500, 500)
         if derivative:
             s = 1 / (1 + numpy.exp(-input))
             return s * (1 - s)
@@ -189,14 +186,28 @@ class NueralNetwork:
         #since output is defined by me to have a possible different activation we do this. 
         #WHEN ADDING MORE THAN MSE THIS STEP WILL NEED TO CHANGE (output - actual) is the derivative only for 1/2 * mse
         if self.OutputActivation == "softmax" and self.lossFunction == "crossEntropy":
-            #soft max and cross entrop cnacel each other out which is why only dZ is here
-            delta = output - actual
+
+            #this is a simplification
+            delta = (output - actual)
+
+            #if you want to direclty apply chain rule rather than shortcut
+            # delta = numpy.dot(
+            #     self.softmax(self.zs[-1], derivative=True),
+            #     self.runLossSingle(output, actual, "crossEntropy", True)
+            #     )
+
 
         elif self.OutputActivation == "sigmoid" and self.lossFunction == "MSE":
-            delta = self.runLossSingle(output,actual, "MSE", True) * self.sigmoid(self.zs[-1], derivative=True)
+            delta = numpy.dot(
+                self.sigmoid(self.zs[-1], derivative=True),
+                self.runLossSingle(output,actual, "MSE", True)
+            )
 
         else:
-            raise Exception("Unsupported activation/loss combination")
+            delta = numpy.dot(
+                            self.activationFunction(self.zs[-1], self.OutputActivation, True),
+                            self.runLossSingle(output,actual, self.lossFunction, True)
+                        )
 
 
         # dL/dW = dZ/dW * dz/dZ * dL/da
@@ -218,10 +229,6 @@ class NueralNetwork:
 
         #to update gradients we apply to gradients to the to the weights times the learning rate so we get
         for i in range(numOfLayers):
-            #prevents extra bad run to alter it too much
-            weightGradients[i] = numpy.clip(weightGradients[i], -1, 1)
-            biasGradients[i] = numpy.clip(biasGradients[i], -1, 1)
-
             self.weights[i] -= self.learningRate * weightGradients[i]
             self.biases[i] -= self.learningRate * biasGradients[i]
 
@@ -233,16 +240,11 @@ if __name__ == "__main__":
 
     numClasses = len(numpy.unique(y))
 
-    std = numpy.std(X, axis=0)
-
-    std[std == 0] = 1
-
-    X = (X - numpy.mean(X, axis=0)) / std
     nn = NueralNetwork(
-        layers=[X.shape[1],64,32, numClasses],
+        layers=[X.shape[1],64,64, numClasses],
         learningRate=0.01,
-        OutputActivation="sigmoid",
-        lossFunction="MSE",
+        OutputActivation="softmax",
+        lossFunction="crossEntropy",
         convergenceMargin=1e-5
     )
 
@@ -260,6 +262,13 @@ if __name__ == "__main__":
     xTest = X[testIndices]
     yTest = y[testIndices]
     yTestEncoded = numpy.eye(numClasses)[yTest]
+
+    std = numpy.std(xTrain, axis=0)
+    
+    std[std == 0] = 1
+
+    xTrain = (xTrain - numpy.mean(xTrain, axis=0)) / std
+    xTest = (xTest - numpy.mean(xTest, axis=0)) / std
 
     print("Train:", xTrain.shape, yTrain.shape)
     print("Test:", xTest.shape, yTest.shape)
