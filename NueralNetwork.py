@@ -3,7 +3,7 @@ from dataset import Dataset
 from sklearn.neural_network import MLPClassifier
 
 class NueralNetwork:
-    def __init__(self, epoch=5000, lossFunction="MSE", learningRate=0.01, layers=None, hiddenLayerActivation="ReLU", OutputActivation="sigmoid", convergenceMargin=0.001) -> None:
+    def __init__(self, epoch=5000, lossFunction="MSE", learningRate=0.01, layers=None, hiddenLayerActivation="ReLU", OutputActivation="sigmoid", convergenceMargin=0.001, batchSize = 10) -> None:
         #activation is RELU by default
         #iteration count of none will run it automatically until no chnages or in a loop
         #loss function is Mean sqaured error by default
@@ -15,6 +15,7 @@ class NueralNetwork:
         self.learningRate = learningRate
         self.weights = []
         self.biases = []
+        self.batchSize = batchSize
         self.convergenceMargin = convergenceMargin
         
 
@@ -72,14 +73,14 @@ class NueralNetwork:
     
 
     def trainSingle(self, input, actual):
-        input = numpy.array(input).reshape(-1, 1)
-        actual = numpy.array(actual).reshape(-1, 1)
+        if self.batchSize == 1 :
+            input = numpy.array(input).reshape(-1, 1)
+            actual = numpy.array(actual).reshape(-1, 1)
+        self.forwardFeed(input)
 
-        prediction = self.forwardFeed(input)
+        return self.backwardFeed(actual)
+    
 
-        loss = self.runLossSingle(prediction, actual, self.lossFunction)
-
-        self.backwardFeed(actual)
 
     def runLossSingle(self, predicted, actual, method, derivative=False):
         if method == "MSE":
@@ -87,12 +88,14 @@ class NueralNetwork:
         if method == "crossEntropy":
             return self.crossEntropySingle(predicted, actual, derivative=derivative)
 
-    def trainSingles(self, input, actual):
+    def trainSingles(self, input, actual):\
+        #THIS WILL LIKELY BE DELETED IN FUTURE AS TRAIN BATCH CAN DO THIS AS WELL AS BATCHED
+        #if you do use this it needs to have self.batchsize be set equal to 1 to not break it
+        #this is why its going to be deleted later as it serves no purpose anymore
 
         #this had automatic convergence spotting
         patience = 0 
         lastLoss = float("inf")
-        temp = 0 
         for epoch in range(self.epoch):
         
                 totalLoss = 0
@@ -100,7 +103,11 @@ class NueralNetwork:
                 indices = numpy.random.permutation(len(input))
         
                 for i in indices:
-                    self.trainSingle(input[i], actual[i])
+                    weightGradients, biasGradients = self.trainSingle(input[i], actual[i])
+                    numOfLayers = len(self.weights)
+                    for i in range(numOfLayers):
+                                self.weights[i] -= self.learningRate * weightGradients[i]
+                                self.biases[i] -= self.learningRate * biasGradients[i]
         
                 for i in range(len(input)):
                     prediction = self.forwardFeed(input[i].reshape(-1,1))
@@ -120,7 +127,60 @@ class NueralNetwork:
                 lastLoss = averageLoss
                 if patience >= 10:
                     break
-                print(epoch)
+                # print(epoch)
+
+    def trainBatch(self, input, actual):
+        patience = 0 
+        lastLoss = float("inf")
+        timesUpdated = 0
+        for epoch in range(self.epoch):
+        
+                totalLoss = 0
+
+        
+                indices = numpy.random.permutation(len(input))
+                numOfLayers = len(self.weights)
+
+                for start in range(0, len(input), self.batchSize):
+                    batchIndices = indices[start:start + self.batchSize]
+
+                    batchInput = input[batchIndices].T
+                    batchActual = actual[batchIndices].T
+
+                    weightGradients, biasGradients = self.trainSingle(
+                        batchInput,
+                        batchActual
+                    )
+
+
+                    for t in range(numOfLayers):
+
+                        self.weights[t] -= self.learningRate * weightGradients[t]
+                        self.biases[t] -= self.learningRate * biasGradients[t]
+                    timesUpdated += 1
+                        
+                        
+        
+                for i in range(len(input)):
+                    prediction = self.forwardFeed(input[i].reshape(-1,1))
+                    totalLoss += self.runLossSingle(
+                        prediction,
+                        actual[i].reshape(-1,1),
+                        self.lossFunction
+                    )
+
+                averageLoss = totalLoss / len(input)
+                if numpy.abs(lastLoss - averageLoss) <= self.convergenceMargin:
+                    patience += 1
+                    print("patience: ", patience)
+                else:
+                    patience = 0
+
+                lastLoss = averageLoss
+                if patience >= 10:
+                    break
+                # print(epoch)
+        print("Total times weights updated: ", timesUpdated)
 
     def MSElossSingle(self, predicted, actual, derivative=False):
         # we multiply by 0.5 because when we take the derivative and get 2(output - actual) it cancels out 
@@ -153,7 +213,11 @@ class NueralNetwork:
             # when the indexs are not the same its -y*y
             return numpy.diag(temp) - numpy.outer(temp, temp)
         else:
-            return expValues / numpy.sum(expValues)
+            return expValues / numpy.sum(
+                expValues,
+                axis=0,
+                keepdims=True
+            )
     
     def ReLU(self, input, derivative=False):
         if derivative:
@@ -195,7 +259,7 @@ class NueralNetwork:
             #     self.softmax(self.zs[-1], derivative=True),
             #     self.runLossSingle(output, actual, "crossEntropy", True)
             #     )
-
+    
 
         elif self.OutputActivation == "sigmoid" and self.lossFunction == "MSE":
             delta = numpy.dot(
@@ -203,6 +267,7 @@ class NueralNetwork:
                 self.runLossSingle(output,actual, "MSE", True)
             )
 
+        #added binary cross entropy for sigmoid
         else:
             delta = numpy.dot(
                             self.activationFunction(self.zs[-1], self.OutputActivation, True),
@@ -212,10 +277,12 @@ class NueralNetwork:
 
         # dL/dW = dZ/dW * dz/dZ * dL/da
         # here its only delta * dW because delta is already defined as dA/dZ * dL/dA 
-        weightGradients[-1] = numpy.dot(delta, self.activations[-2].T)
+        weightGradients[-1] = numpy.dot(delta, self.activations[-2].T) / delta.shape[1]
+        #bias is just one so dL/dB = dZ/dB * da/dZ * dL/da translates to da/dZ * dL/da which delta already define
 
-        #bias is just one so dL/dB = dZ/dB * da/dZ * dL/da translates to da/dZ * dL/da which delta already defines
-        biasGradients[-1] = delta
+        biasGradients[-1] = (
+            numpy.sum(delta, axis=1, keepdims=True) / delta.shape[1]
+        )
 
         #stepping down and stopping at -1
         #starting at -2 because we already did output layer and -1 for lists
@@ -224,13 +291,17 @@ class NueralNetwork:
             delta = numpy.dot(self.weights[i + 1].T, delta) * self.activationFunction(self.zs[i], self.hiddenLayerActivation, True) 
         
             #same as output layer logic
-            weightGradients[i] = numpy.dot(delta, self.activations[i].T )
-            biasGradients[i] = delta
+            weightGradients[i] = numpy.dot(delta, self.activations[i].T ) / delta.shape[1]
+            biasGradients[i] = (
+                numpy.sum(delta, axis=1, keepdims=True) / delta.shape[1]
+            )
 
         #to update gradients we apply to gradients to the to the weights times the learning rate so we get
-        for i in range(numOfLayers):
-            self.weights[i] -= self.learningRate * weightGradients[i]
-            self.biases[i] -= self.learningRate * biasGradients[i]
+        #changed to just return for now so we can 
+        # for i in range(numOfLayers):
+        #     self.weights[i] -= self.learningRate * weightGradients[i]
+        #     self.biases[i] -= self.learningRate * biasGradients[i]
+        return weightGradients, biasGradients
 
 if __name__ == "__main__":
     X, y = Dataset.loadDigits()
@@ -245,7 +316,8 @@ if __name__ == "__main__":
         learningRate=0.01,
         OutputActivation="softmax",
         lossFunction="crossEntropy",
-        convergenceMargin=1e-5
+        convergenceMargin=1e-5,
+        batchSize=1
     )
 
     indices = numpy.random.permutation(len(X))
@@ -263,18 +335,18 @@ if __name__ == "__main__":
     yTest = y[testIndices]
     yTestEncoded = numpy.eye(numClasses)[yTest]
 
-    std = numpy.std(xTrain, axis=0)
-    
-    std[std == 0] = 1
+    trainMean = numpy.mean(xTrain, axis=0)
+    trainStd = numpy.std(xTrain, axis=0)
 
-    xTrain = (xTrain - numpy.mean(xTrain, axis=0)) / std
-    xTest = (xTest - numpy.mean(xTest, axis=0)) / std
+    trainStd[trainStd == 0] = 1
+
+    xTrain = (xTrain - trainMean) / trainStd
+    xTest = (xTest - trainMean) / trainStd
 
     print("Train:", xTrain.shape, yTrain.shape)
     print("Test:", xTest.shape, yTest.shape)
-    
-    nn.trainSingles(xTrain, yTrainEncoded)
 
+    nn.trainBatch(xTrain, yTrainEncoded)
 
     correct = 0
     totalLoss = 0
@@ -283,6 +355,7 @@ if __name__ == "__main__":
         prediction = nn.forwardFeed(
             xTest[i].reshape(-1,1)
         )
+        
 
         actual = yTest[i]
 
@@ -297,7 +370,7 @@ if __name__ == "__main__":
         if predictedClass == actual:
             correct += 1
 
-        print(predictedClass, " ---- ", actual)
+        # print(predictedClass, " ---- ", actual)
 
         
 
