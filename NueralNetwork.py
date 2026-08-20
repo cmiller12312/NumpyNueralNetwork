@@ -310,7 +310,7 @@ if __name__ == "__main__":
 
     numClasses = len(numpy.unique(y))
 
-    nn = NueralNetwork(
+    nn = NeuralNetwork(
         layers=[X.shape[1],64,64, numClasses],
         learningRate=0.01,
         OutputActivation="softmax",
