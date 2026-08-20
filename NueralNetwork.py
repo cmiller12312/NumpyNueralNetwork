@@ -2,8 +2,8 @@ import numpy
 from dataset import Dataset
 from sklearn.neural_network import MLPClassifier
 
-class NueralNetwork:
-    def __init__(self, epoch=5000, lossFunction="MSE", learningRate=0.01, layers=None, hiddenLayerActivation="ReLU", OutputActivation="sigmoid", convergenceMargin=0.001, batchSize = 10) -> None:
+class NeuralNetwork:
+    def __init__(self, epoch=5000, lossFunction="MSE", learningRate=0.01, layers=None, hiddenLayerActivation="ReLU", OutputActivation="sigmoid", convergenceMargin=0.001, batchSize = 1) -> None:
         #activation is RELU by default
         #iteration count of none will run it automatically until no chnages or in a loop
         #loss function is Mean sqaured error by default
@@ -88,46 +88,46 @@ class NueralNetwork:
         if method == "crossEntropy":
             return self.crossEntropySingle(predicted, actual, derivative=derivative)
 
-    def trainSingles(self, input, actual):\
-        #THIS WILL LIKELY BE DELETED IN FUTURE AS TRAIN BATCH CAN DO THIS AS WELL AS BATCHED
-        #if you do use this it needs to have self.batchsize be set equal to 1 to not break it
-        #this is why its going to be deleted later as it serves no purpose anymore
+    # def trainSingles(self, input, actual):\
+    #     #THIS WILL LIKELY BE DELETED IN FUTURE AS TRAIN BATCH CAN DO THIS AS WELL AS BATCHED
+    #     #if you do use this it needs to have self.batchsize be set equal to 1 to not break it
+    #     #this is why its going to be deleted later as it serves no purpose anymore
 
-        #this had automatic convergence spotting
-        patience = 0 
-        lastLoss = float("inf")
-        for epoch in range(self.epoch):
+    #     #this had automatic convergence spotting
+    #     patience = 0 
+    #     lastLoss = float("inf")
+    #     for epoch in range(self.epoch):
         
-                totalLoss = 0
+    #             totalLoss = 0
         
-                indices = numpy.random.permutation(len(input))
+    #             indices = numpy.random.permutation(len(input))
         
-                for i in indices:
-                    weightGradients, biasGradients = self.trainSingle(input[i], actual[i])
-                    numOfLayers = len(self.weights)
-                    for i in range(numOfLayers):
-                                self.weights[i] -= self.learningRate * weightGradients[i]
-                                self.biases[i] -= self.learningRate * biasGradients[i]
+    #             for i in indices:
+    #                 weightGradients, biasGradients = self.trainSingle(input[i], actual[i])
+    #                 numOfLayers = len(self.weights)
+    #                 for i in range(numOfLayers):
+    #                             self.weights[i] -= self.learningRate * weightGradients[i]
+    #                             self.biases[i] -= self.learningRate * biasGradients[i]
         
-                for i in range(len(input)):
-                    prediction = self.forwardFeed(input[i].reshape(-1,1))
-                    totalLoss += self.runLossSingle(
-                        prediction,
-                        actual[i].reshape(-1,1),
-                        self.lossFunction
-                    )
+    #             for i in range(len(input)):
+    #                 prediction = self.forwardFeed(input[i].reshape(-1,1))
+    #                 totalLoss += self.runLossSingle(
+    #                     prediction,
+    #                     actual[i].reshape(-1,1),
+    #                     self.lossFunction
+    #                 )
 
-                averageLoss = totalLoss / len(input)
-                if numpy.abs(lastLoss - averageLoss) <= self.convergenceMargin:
-                    patience += 1
-                    print("patience: ", patience)
-                else:
-                    patience = 0
+    #             averageLoss = totalLoss / len(input)
+    #             if numpy.abs(lastLoss - averageLoss) <= self.convergenceMargin:
+    #                 patience += 1
+    #                 print("patience: ", patience)
+    #             else:
+    #                 patience = 0
 
-                lastLoss = averageLoss
-                if patience >= 10:
-                    break
-                # print(epoch)
+    #             lastLoss = averageLoss
+    #             if patience >= 10:
+    #                 break
+    #             # print(epoch)
 
     def trainBatch(self, input, actual):
         patience = 0 
@@ -248,7 +248,6 @@ class NueralNetwork:
 
         #chain rule applies here
         #since output is defined by me to have a possible different activation we do this. 
-        #WHEN ADDING MORE THAN MSE THIS STEP WILL NEED TO CHANGE (output - actual) is the derivative only for 1/2 * mse
         if self.OutputActivation == "softmax" and self.lossFunction == "crossEntropy":
 
             #this is a simplification
@@ -317,7 +316,7 @@ if __name__ == "__main__":
         OutputActivation="softmax",
         lossFunction="crossEntropy",
         convergenceMargin=1e-5,
-        batchSize=1
+        batchSize=5
     )
 
     indices = numpy.random.permutation(len(X))
@@ -389,7 +388,7 @@ if __name__ == "__main__":
         solver="sgd",
         learning_rate="constant",
         learning_rate_init=0.01,
-        batch_size=1,
+        batch_size=5,
         momentum=0,
         max_iter=5000,
         random_state=42
